@@ -96,7 +96,7 @@ function render() {
       <section class="hero-grid">
         <section class="hero-copy">
           <p class="kicker">Soroban testnet voting</p>
-          <h1>Stellar<br />Poll<br />Contract</h1>
+          <h1>On-chain<br />Poll<br />Room</h1>
           <p class="date-line">One wallet, one vote per round</p>
 
           <div class="partner-lines">
@@ -111,15 +111,17 @@ function render() {
         </section>
 
         <section class="visual-board" aria-label="Poll visual board">
-          <div class="tile tile-orange tile-o-one">O</div>
-          <div class="tile tile-paper tile-code">&lt;/&gt;</div>
-          <div class="tile tile-mint tile-r">R</div>
-          <div class="tile tile-lilac tile-v">V</div>
-          <div class="tile tile-purple tile-e">E</div>
-          <div class="tile tile-blue tile-f">F</div>
-          <div class="tile tile-yellow tile-l">L</div>
-          <div class="tile tile-orange tile-o-two">O</div>
-          <div class="tile tile-pink tile-w">W</div>
+          <div class="ballot-card">
+            <span class="ballot-title">BALLOT</span>
+            <span class="ballot-line"></span>
+            <span class="ballot-line short"></span>
+            <span class="ballot-mark">✓</span>
+          </div>
+          <div class="vote-cube cube-yes">YES</div>
+          <div class="vote-cube cube-no">NO</div>
+          <div class="vote-cube cube-one">1</div>
+          <div class="vote-cube cube-round">R${state.round}</div>
+          <div class="wallet-ticket">wallet pass</div>
           <div class="cursor-shape"></div>
           <div class="chat-shape"><span></span><span></span><span></span></div>
           <div class="pencil-shape"></div>
