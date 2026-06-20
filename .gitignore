@@ -1,4 +1,6 @@
 /target/
+/node_modules/
+/dist/
 test_snapshots/
 /.stellar/
 .DS_Store

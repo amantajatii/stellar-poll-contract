@@ -92,6 +92,9 @@ pub struct PollResult {
 - Rust
 - `soroban-sdk` 25.3.0
 - Stellar CLI
+- Vite frontend
+- Stellar JavaScript SDK
+- Freighter wallet API
 
 ## Build
 
@@ -110,6 +113,31 @@ target/wasm32v1-none/release/stellar_poll_contract.wasm
 ```bash
 cargo test
 ```
+
+## Frontend
+
+Install frontend dependencies:
+
+```bash
+npm install
+```
+
+Run the local web app:
+
+```bash
+npm run dev
+```
+
+The frontend connects to the deployed testnet contract and supports:
+
+- Connect Freighter wallet
+- Read the current poll result
+- Set or update the poll question
+- Vote yes
+- Vote no
+- Reset vote counters
+
+Use Freighter on `TESTNET` before submitting write transactions.
 
 ## Deploy To Testnet
 
