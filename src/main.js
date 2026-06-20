@@ -14,18 +14,10 @@ import {
   requestAccess,
   signTransaction,
 } from "@stellar/freighter-api";
-import {
-  BarChart3,
-  Check,
-  CircleOff,
-  RefreshCcw,
-  RotateCcw,
-  Send,
-  Wallet,
-} from "lucide";
+import { Check, CircleOff, RefreshCcw, RotateCcw, Send, Wallet } from "lucide";
 import "./styles.css";
 
-const CONTRACT_ID = "CD4ZRYTEHTLKPGY2ORRRYICGHMRGYVGFCHSZUWX4JQBOJUYDOGUCLEEO";
+const CONTRACT_ID = "CBZA3WA6EZISTFCCRZCQNM633QTTOJWVQLEAMIZQU4RD4PJLRBBGUXBJ";
 const RPC_URL = "https://soroban-testnet.stellar.org:443";
 const READ_SOURCE = "GCCD76JRX7QPKH7OF6Q3CFGKD5JOA4PWHRCKPEKS3YLLFP6EVCUV6KUG";
 const EXPLORER_URL = `https://lab.stellar.org/r/testnet/contract/${CONTRACT_ID}`;
@@ -40,6 +32,9 @@ const state = {
   yesVotes: 0,
   noVotes: 0,
   totalVotes: 0,
+  round: 1,
+  hasVoted: false,
+  userVote: "NONE",
   busy: false,
   status: "Ready",
   error: "",
@@ -71,92 +66,116 @@ function normalizeResult(result, key) {
   return result?.[key] ?? result;
 }
 
+function addressArg() {
+  return nativeToScVal(state.wallet, { type: "address" });
+}
+
 function resultPercent(value) {
   if (!state.totalVotes) return 0;
   return Math.round((value / state.totalVotes) * 100);
 }
 
+function voteLabel() {
+  if (!state.wallet) return "Connect wallet to vote";
+  if (!state.hasVoted) return "Wallet has not voted this round";
+  return `Wallet voted ${state.userVote === "YES" ? "yes" : "no"} in round ${state.round}`;
+}
+
 function render() {
   const yesPercent = resultPercent(state.yesVotes);
   const noPercent = resultPercent(state.noVotes);
+  const voteDisabled = state.busy || state.hasVoted;
 
   app.innerHTML = `
-    <main class="shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Soroban testnet poll</p>
-          <h1>Stellar Poll Contract</h1>
-        </div>
-        <div class="wallet-panel">
-          <span class="network-pill">${state.network || "TESTNET"}</span>
-          <button class="button button-secondary" data-action="connect">
-            ${icon(Wallet)}
-            <span>${state.wallet ? shortAddress(state.wallet) : "Connect Freighter"}</span>
-          </button>
-        </div>
+    <main class="site-shell">
+      <header class="masthead">
+        <div class="masthead-title">Stellar Poll 2026</div>
+        <div class="masthead-date"><span>&lt;round&gt;</span> ${state.round} <span>&lt;/round&gt;</span></div>
       </header>
 
-      <section class="poll-layout">
-        <section class="poll-main" aria-live="polite">
-          <div class="question-row">
-            <span class="contract-chip">${shortAddress(CONTRACT_ID)}</span>
-            <a href="${EXPLORER_URL}" target="_blank" rel="noreferrer">View contract</a>
+      <section class="hero-grid">
+        <section class="hero-copy">
+          <p class="kicker">Soroban testnet voting</p>
+          <h1>Stellar<br />Poll<br />Contract</h1>
+          <p class="date-line">One wallet, one vote per round</p>
+
+          <div class="partner-lines">
+            <p><span>Contract:</span> <a href="${EXPLORER_URL}" target="_blank" rel="noreferrer">${shortAddress(CONTRACT_ID)}</a></p>
+            <p><span>Wallet:</span> ${shortAddress(state.wallet)}</p>
           </div>
-          <h2>${escapeHtml(state.question)}</h2>
-          <div class="vote-actions">
-            <button class="vote-button vote-yes" data-action="vote-yes" ${state.busy ? "disabled" : ""}>
-              ${icon(Check, 22)}
-              <span>Vote yes</span>
-            </button>
-            <button class="vote-button vote-no" data-action="vote-no" ${state.busy ? "disabled" : ""}>
-              ${icon(CircleOff, 22)}
-              <span>Vote no</span>
-            </button>
-          </div>
+
+          <button class="register-button" data-action="connect">
+            <span>${state.wallet ? "Wallet connected" : "Connect Freighter"}</span>
+            <span class="arrow-box">↗</span>
+          </button>
         </section>
 
-        <aside class="result-panel">
-          <div class="panel-heading">
-            <span>${icon(BarChart3)}</span>
-            <h2>Live result</h2>
-          </div>
-          <div class="meter-group">
-            <div class="meter-copy"><span>Yes</span><strong>${state.yesVotes} (${yesPercent}%)</strong></div>
-            <div class="meter"><span style="width: ${yesPercent}%"></span></div>
-          </div>
-          <div class="meter-group">
-            <div class="meter-copy"><span>No</span><strong>${state.noVotes} (${noPercent}%)</strong></div>
-            <div class="meter meter-no"><span style="width: ${noPercent}%"></span></div>
-          </div>
-          <div class="total-row"><span>Total votes</span><strong>${state.totalVotes}</strong></div>
-          <button class="button button-secondary full" data-action="refresh" ${state.busy ? "disabled" : ""}>
-            ${icon(RefreshCcw)}
-            <span>Refresh result</span>
+        <section class="visual-board" aria-label="Poll visual board">
+          <div class="tile tile-orange tile-o-one">O</div>
+          <div class="tile tile-paper tile-code">&lt;/&gt;</div>
+          <div class="tile tile-mint tile-r">R</div>
+          <div class="tile tile-lilac tile-v">V</div>
+          <div class="tile tile-purple tile-e">E</div>
+          <div class="tile tile-blue tile-f">F</div>
+          <div class="tile tile-yellow tile-l">L</div>
+          <div class="tile tile-orange tile-o-two">O</div>
+          <div class="tile tile-pink tile-w">W</div>
+          <div class="cursor-shape"></div>
+          <div class="chat-shape"><span></span><span></span><span></span></div>
+          <div class="pencil-shape"></div>
+        </section>
+      </section>
+
+      <section class="poll-strip">
+        <div class="question-panel">
+          <div class="section-tab">Current question</div>
+          <h2>${escapeHtml(state.question)}</h2>
+          <p>${escapeHtml(voteLabel())}</p>
+        </div>
+
+        <div class="vote-panel yes-panel">
+          <button data-action="vote-yes" ${voteDisabled ? "disabled" : ""}>
+            ${icon(Check, 24)}
+            <span>Vote yes</span>
           </button>
-        </aside>
+          <strong>${state.yesVotes}</strong>
+          <span>${yesPercent}%</span>
+        </div>
+
+        <div class="vote-panel no-panel">
+          <button data-action="vote-no" ${voteDisabled ? "disabled" : ""}>
+            ${icon(CircleOff, 24)}
+            <span>Vote no</span>
+          </button>
+          <strong>${state.noVotes}</strong>
+          <span>${noPercent}%</span>
+        </div>
       </section>
 
-      <section class="controls">
+      <section class="tool-row">
         <form class="question-form" data-action="set-question">
-          <label for="question">Poll question</label>
-          <div class="input-row">
-            <input id="question" name="question" maxlength="160" value="${escapeAttribute(state.question === "No question set" ? "" : state.question)}" placeholder="Should Stellar be used for workshop apps?" />
-            <button class="button" type="submit" ${state.busy ? "disabled" : ""}>
-              ${icon(Send)}
-              <span>Set question</span>
-            </button>
-          </div>
+          <label for="question">Set poll question</label>
+          <input id="question" name="question" maxlength="160" value="${escapeAttribute(state.question === "No question set" ? "" : state.question)}" />
+          <button class="tool-button" type="submit" ${state.busy ? "disabled" : ""}>${icon(Send)} Set</button>
         </form>
-        <button class="button button-danger" data-action="reset" ${state.busy ? "disabled" : ""}>
-          ${icon(RotateCcw)}
-          <span>Reset votes</span>
-        </button>
+
+        <button class="tool-button" data-action="refresh" ${state.busy ? "disabled" : ""}>${icon(RefreshCcw)} Refresh</button>
+        <button class="tool-button tool-danger" data-action="reset" ${state.busy ? "disabled" : ""}>${icon(RotateCcw)} New round</button>
       </section>
 
-      <footer class="status-line ${state.error ? "is-error" : ""}">
+      <footer class="bottom-nav">
+        <span class="active">Overview</span>
+        <span>Question</span>
+        <span>Yes ${state.yesVotes}</span>
+        <span>No ${state.noVotes}</span>
+        <span>Total ${state.totalVotes}</span>
+        <span class="register-link">Vote <b>↗</b></span>
+      </footer>
+
+      <div class="status-line ${state.error ? "is-error" : ""}">
         <span>${escapeHtml(state.error || state.status)}</span>
         ${state.lastHash ? `<a href="https://stellar.expert/explorer/testnet/tx/${state.lastHash}" target="_blank" rel="noreferrer">Last transaction</a>` : ""}
-      </footer>
+      </div>
     </main>
   `;
 
@@ -165,8 +184,8 @@ function render() {
 
 function bindEvents() {
   document.querySelector('[data-action="connect"]').addEventListener("click", connectWallet);
-  document.querySelector('[data-action="vote-yes"]').addEventListener("click", () => submitCall("vote_yes"));
-  document.querySelector('[data-action="vote-no"]').addEventListener("click", () => submitCall("vote_no"));
+  document.querySelector('[data-action="vote-yes"]').addEventListener("click", () => submitVote("vote_yes"));
+  document.querySelector('[data-action="vote-no"]').addEventListener("click", () => submitVote("vote_no"));
   document.querySelector('[data-action="refresh"]').addEventListener("click", refreshResult);
   document.querySelector('[data-action="reset"]').addEventListener("click", () => submitCall("reset_votes"));
   document.querySelector('[data-action="set-question"]').addEventListener("submit", async (event) => {
@@ -194,18 +213,32 @@ async function connectWallet() {
     }
 
     state.status = "Wallet connected.";
+    await refreshResult(false);
   });
 }
 
-async function refreshResult() {
-  await runTask("Reading poll result...", async () => {
+async function refreshResult(showBusy = true) {
+  const task = async () => {
     const result = await simulateCall("get_result");
     state.question = result.question || "No question set";
     state.yesVotes = Number(result.yes_votes || 0);
     state.noVotes = Number(result.no_votes || 0);
     state.totalVotes = Number(result.total_votes || 0);
+    state.round = Number(result.round || 1);
+
+    if (state.wallet) {
+      state.hasVoted = Boolean(await simulateCall("has_voted", [addressArg()]));
+      state.userVote = String(await simulateCall("get_vote", [addressArg()]));
+    }
+
     state.status = "Result synced from Stellar testnet.";
-  });
+  };
+
+  if (showBusy) {
+    await runTask("Reading poll result...", task);
+  } else {
+    await task();
+  }
 }
 
 async function simulateCall(method, args = []) {
@@ -224,6 +257,11 @@ async function simulateCall(method, args = []) {
   }
 
   return scValToNative(simulation.result.retval);
+}
+
+async function submitVote(method) {
+  if (!state.wallet) await connectWallet();
+  await submitCall(method, [addressArg()]);
 }
 
 async function submitCall(method, args = []) {
@@ -265,7 +303,7 @@ async function submitCall(method, args = []) {
 
     state.lastHash = response.hash;
     state.status = "Transaction confirmed.";
-    await refreshResult();
+    await refreshResult(false);
   });
 }
 

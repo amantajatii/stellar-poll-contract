@@ -1,6 +1,8 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Env, String, Symbol};
+use soroban_sdk::{
+    contract, contractimpl, contracttype, symbol_short, Address, Env, String, Symbol,
+};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -9,11 +11,21 @@ pub struct PollResult {
     pub yes_votes: u32,
     pub no_votes: u32,
     pub total_votes: u32,
+    pub round: u32,
 }
 
-const QUESTION: Symbol = symbol_short!("QUESTION");
-const YES_VOTES: Symbol = symbol_short!("YES");
-const NO_VOTES: Symbol = symbol_short!("NO");
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DataKey {
+    Question,
+    YesVotes,
+    NoVotes,
+    Round,
+    Vote(Address, u32),
+}
+
+const YES: Symbol = symbol_short!("YES");
+const NO: Symbol = symbol_short!("NO");
 
 #[contract]
 pub struct PollContract;
@@ -21,7 +33,7 @@ pub struct PollContract;
 #[contractimpl]
 impl PollContract {
     pub fn set_question(env: Env, question: String) -> bool {
-        env.storage().instance().set(&QUESTION, &question);
+        env.storage().instance().set(&DataKey::Question, &question);
         env.storage().instance().extend_ttl(100, 518400);
         true
     }
@@ -29,34 +41,48 @@ impl PollContract {
     pub fn get_question(env: Env) -> String {
         env.storage()
             .instance()
-            .get(&QUESTION)
+            .get(&DataKey::Question)
             .unwrap_or(String::from_str(&env, "No question set"))
     }
 
-    pub fn vote_yes(env: Env) -> u32 {
-        let votes = Self::yes_votes(env.clone()) + 1;
-        env.storage().instance().set(&YES_VOTES, &votes);
-        env.storage().instance().extend_ttl(100, 518400);
-        votes
+    pub fn vote_yes(env: Env, voter: Address) -> bool {
+        Self::vote(env, voter, YES)
     }
 
-    pub fn vote_no(env: Env) -> u32 {
-        let votes = Self::no_votes(env.clone()) + 1;
-        env.storage().instance().set(&NO_VOTES, &votes);
-        env.storage().instance().extend_ttl(100, 518400);
-        votes
+    pub fn vote_no(env: Env, voter: Address) -> bool {
+        Self::vote(env, voter, NO)
+    }
+
+    pub fn has_voted(env: Env, voter: Address) -> bool {
+        let key = DataKey::Vote(voter, Self::round(env.clone()));
+        env.storage().persistent().has(&key)
+    }
+
+    pub fn get_vote(env: Env, voter: Address) -> Symbol {
+        let key = DataKey::Vote(voter, Self::round(env.clone()));
+        env.storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or(symbol_short!("NONE"))
     }
 
     pub fn yes_votes(env: Env) -> u32 {
-        env.storage().instance().get(&YES_VOTES).unwrap_or(0)
+        env.storage()
+            .instance()
+            .get(&DataKey::YesVotes)
+            .unwrap_or(0)
     }
 
     pub fn no_votes(env: Env) -> u32 {
-        env.storage().instance().get(&NO_VOTES).unwrap_or(0)
+        env.storage().instance().get(&DataKey::NoVotes).unwrap_or(0)
     }
 
     pub fn total_votes(env: Env) -> u32 {
         Self::yes_votes(env.clone()) + Self::no_votes(env)
+    }
+
+    pub fn round(env: Env) -> u32 {
+        env.storage().instance().get(&DataKey::Round).unwrap_or(1)
     }
 
     pub fn get_result(env: Env) -> PollResult {
@@ -64,16 +90,42 @@ impl PollContract {
         let no_votes = Self::no_votes(env.clone());
 
         PollResult {
-            question: Self::get_question(env),
+            question: Self::get_question(env.clone()),
             yes_votes,
             no_votes,
             total_votes: yes_votes + no_votes,
+            round: Self::round(env),
         }
     }
 
     pub fn reset_votes(env: Env) -> bool {
-        env.storage().instance().set(&YES_VOTES, &0u32);
-        env.storage().instance().set(&NO_VOTES, &0u32);
+        let next_round = Self::round(env.clone()) + 1;
+        env.storage().instance().set(&DataKey::YesVotes, &0u32);
+        env.storage().instance().set(&DataKey::NoVotes, &0u32);
+        env.storage().instance().set(&DataKey::Round, &next_round);
+        env.storage().instance().extend_ttl(100, 518400);
+        true
+    }
+
+    fn vote(env: Env, voter: Address, choice: Symbol) -> bool {
+        voter.require_auth();
+
+        let round = Self::round(env.clone());
+        let key = DataKey::Vote(voter, round);
+        if env.storage().persistent().has(&key) {
+            return false;
+        }
+
+        if choice == YES {
+            let votes = Self::yes_votes(env.clone()) + 1;
+            env.storage().instance().set(&DataKey::YesVotes, &votes);
+        } else {
+            let votes = Self::no_votes(env.clone()) + 1;
+            env.storage().instance().set(&DataKey::NoVotes, &votes);
+        }
+
+        env.storage().persistent().set(&key, &choice);
+        env.storage().persistent().extend_ttl(&key, 100, 518400);
         env.storage().instance().extend_ttl(100, 518400);
         true
     }
